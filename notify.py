@@ -40,9 +40,10 @@ WXPUSHER_USERS_URL = "https://wxpusher.zjiecode.com/api/fun/wxuser/v2"
 
 # 共享 AppToken（开源版默认使用此 Token，用户也可替换为自己的）
 DEFAULT_APP_TOKEN = "AT_mx4gZJ9t47IibakBWuCQ5qoNyfn0eJXo"
+DEFAULT_APP_ID = 131553
 
 # WxPusher 公众号订阅链接
-WXPUSHER_SUBSCRIBE_URL = f"https://wxpusher.zjiecode.com/wxuser/?appToken={DEFAULT_APP_TOKEN}"
+WXPUSHER_SUBSCRIBE_URL = f"https://wxpusher.zjiecode.com/wxuser/?type=1&id={DEFAULT_APP_ID}#/follow"
 
 # AI 终端检测规则
 KNOWN_TERMINALS = {
@@ -189,10 +190,17 @@ def show_qrcode_terminal(url):
     """在终端中显示 ASCII QR 码。"""
     try:
         import qrcode
-        qr = qrcode.QRCode(border=1)
+        qr = qrcode.QRCode(border=2, box_size=1)
         qr.add_data(url)
         qr.make(fit=True)
+        print()
+        print("  ╔══════════════════════════════════════╗")
+        print("  ║  📱 请用微信扫描以下二维码关注公众号  ║")
+        print("  ╚══════════════════════════════════════╝")
+        print()
         qr.print_ascii(invert=True)
+        print()
+        print("  (如果二维码显示异常，请用浏览器打开下方链接)")
         return True
     except ImportError:
         return False
@@ -202,7 +210,7 @@ def show_qrcode_url(url):
     """显示链接并用系统默认浏览器打开。"""
     print()
     print("  ┌─────────────────────────────────────────────┐")
-    print("  │  请用微信扫描下方二维码，或打开以下链接：       │")
+    print("  │  请用微信扫描二维码，或打开以下链接扫码：       │")
     print("  │                                             │")
     print(f"  │  {url} │")
     print("  └─────────────────────────────────────────────┘")
@@ -212,7 +220,7 @@ def show_qrcode_url(url):
     try:
         import webbrowser
         webbrowser.open(url)
-        print("  已自动在浏览器中打开。")
+        print("  ✓ 已自动在浏览器中打开二维码页面")
     except Exception:
         pass
 
@@ -355,27 +363,16 @@ def setup_wizard():
     # 步骤 1: 配置 AppToken
     app_token = config.get("appToken", "")
     if not app_token:
-        print("  [1/4] AppToken 配置")
-        print()
-        print(f"  使用默认共享 AppToken: {DEFAULT_APP_TOKEN[:20]}...")
-        print("  (你可以通过 --setup 随时替换为自己的 AppToken)")
-        print()
-        use_default = input("  使用默认配置? [Y/n]: ").strip().lower()
-        if use_default in ("n", "no"):
-            app_token = input("  请输入你的 AppToken: ").strip()
-            if not app_token:
-                print("  AppToken 不能为空，已取消。")
-                return False
-        else:
-            app_token = DEFAULT_APP_TOKEN
+        app_token = DEFAULT_APP_TOKEN
         config["appToken"] = app_token
+    print("  [1/4] AppToken: ✓ 已配置")
 
     # 步骤 2: 显示 QR 码
     print()
     print("  [2/4] 关注公众号")
     print()
 
-    subscribe_url = WXPUSHER_SUBSCRIBE_URL.replace(DEFAULT_APP_TOKEN, app_token)
+    subscribe_url = WXPUSHER_SUBSCRIBE_URL
 
     # 尝试显示终端 QR 码
     qr_shown = show_qrcode_terminal(subscribe_url)
