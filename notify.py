@@ -395,52 +395,81 @@ def setup_wizard():
     uid = config.get("uid", "")
     if uid:
         print(f"  当前 UID: {uid}")
-        keep = input("  保持不变? [Y/n]: ").strip().lower()
+        try:
+            keep = input("  保持不变? [Y/n]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            keep = "y"
         if keep in ("n", "no"):
             uid = ""
 
     if not uid:
         retry_count = 0
         while retry_count < 10:
-            input(f"  扫码关注后，按 Enter 继续... (第 {retry_count + 1} 次尝试)")
+            try:
+                input(f"  扫码关注后，按 Enter 继续... (第 {retry_count + 1} 次尝试)")
+            except (EOFError, KeyboardInterrupt):
+                print("\n  输入已取消。")
+                break
             print()
             print("  正在查询用户列表...")
 
             users = query_users(app_token)
 
             if users:
+                # 按关注时间倒序排列，最新的在前面
+                users.sort(key=lambda u: u.get("createTime", 0), reverse=True)
+
                 print()
                 print(f"  找到 {len(users)} 个已关注用户：")
                 print()
                 for i, u in enumerate(users):
-                    print(f"  [{i + 1}] 昵称: {u.get('nickName', '未知')}")
+                    nickname = u.get('nickName', '') or '(未设置昵称)'
+                    uid_short = u.get('uid', '')[:20] + '...'
+                    ts = u.get('createTime', 0)
+                    if ts:
+                        from datetime import datetime
+                        t = datetime.fromtimestamp(ts / 1000).strftime('%Y-%m-%d %H:%M')
+                    else:
+                        t = '未知'
+                    marker = ' ← 最新' if i == 0 else ''
+                    print(f"  [{i + 1}] {nickname}{marker}")
                     print(f"      UID: {u.get('uid')}")
-                    print(f"      关注时间: {u.get('createTime', '未知')}")
+                    print(f"      关注时间: {t}")
                     print()
 
                 if len(users) == 1:
-                    print(f"  只有一个用户，自动选择: {users[0].get('nickName', '未知')}")
+                    nickname = users[0].get('nickName', '') or '该用户'
+                    print(f"  只有一个用户，自动选择: {nickname}")
                     uid = users[0]["uid"]
                     break
                 else:
-                    choice = input(f"  请选择你的用户 [1-{len(users)}]: ").strip()
+                    print(f"  如果你刚扫描关注，通常选择第 1 个（最新）。")
+                    try:
+                        choice = input(f"  请选择你的用户 [1-{len(users)}，默认 1]: ").strip()
+                    except (EOFError, KeyboardInterrupt):
+                        choice = "1"
+                    if not choice:
+                        choice = "1"
                     try:
                         idx = int(choice) - 1
                         if 0 <= idx < len(users):
                             uid = users[idx]["uid"]
                             break
                         else:
-                            print("  无效选择，请重试。")
+                            print(f"  无效选择，请输入 1-{len(users)}。")
                     except ValueError:
-                        print("  无效输入，请重试。")
+                        print(f"  无效输入，请输入数字 1-{len(users)}。")
             else:
                 print()
                 print("  还没有找到用户。请确保：")
-                print("  1. 已用微信扫描二维码")
+                print("  1. 已用微信扫描上方二维码")
                 print("  2. 已关注 WxPusher 公众号")
-                print("  3. 公众号已授权并显示\"订阅成功\"")
+                print("  3. 公众号显示\"订阅成功\"")
                 print()
-                retry = input("  重新查询? [Y/n]: ").strip().lower()
+                try:
+                    retry = input("  重新查询? [Y/n]: ").strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    retry = "y"
                 if retry in ("n", "no"):
                     break
                 retry_count += 1
