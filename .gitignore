@@ -8,3 +8,6 @@ __pycache__/
 *.pyc
 briefing_*.md
 sent_news_tracker.json
+build/
+dist/
+*.spec
