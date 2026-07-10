@@ -127,4 +127,4 @@ echo ""
 # --------------------------------------------------
 # 启动安装向导
 # --------------------------------------------------
-exec $PYTHON "$INSTALL_DIR/notify.py" --setup
+exec $PYTHON "$INSTALL_DIR/notify.py" --setup < /dev/tty
