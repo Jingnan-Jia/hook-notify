@@ -3,7 +3,7 @@
 # hook-notify 一键安装脚本
 #
 # 用法:
-#   curl -fsSL https://raw.githubusercontent.com/xxx/hook-notify/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Jingnan-Jia/hook-notify/main/install.sh | bash
 #
 #  或本地安装:
 #   bash install.sh
@@ -65,16 +65,21 @@ if [ -f "./notify.py" ] && [ -f "./install.sh" ]; then
 else
     # 远程安装模式
     echo "  远程安装模式"
-    if [ -d "$INSTALL_DIR" ]; then
+    if [ -d "$INSTALL_DIR/.git" ]; then
         echo "  目录已存在，更新..."
         cd "$INSTALL_DIR"
         git pull origin "$BRANCH" --ff-only 2>/dev/null || true
     else
-        mkdir -p "$(dirname "$INSTALL_DIR")"
-        # 暂时用本地文件代替 git clone
-        # git clone --depth 1 -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
-        echo -e "  ${YELLOW}⚠ 远程仓库尚未就绪，请将项目文件放入 $INSTALL_DIR${NC}"
-        echo "  cp notify.py $INSTALL_DIR/"
+        rm -rf "$INSTALL_DIR"
+        if command -v git &> /dev/null; then
+            echo "  通过 git clone 下载..."
+            git clone --depth 1 -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+        else
+            echo "  通过 curl 下载..."
+            mkdir -p "$INSTALL_DIR"
+            curl -fsSL "https://raw.githubusercontent.com/Jingnan-Jia/hook-notify/$BRANCH/notify.py" -o "$INSTALL_DIR/notify.py"
+            curl -fsSL "https://raw.githubusercontent.com/Jingnan-Jia/hook-notify/$BRANCH/requirements.txt" -o "$INSTALL_DIR/requirements.txt"
+        fi
     fi
 fi
 
