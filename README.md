@@ -15,7 +15,7 @@ curl -fsSL https://raw.githubusercontent.com/xxx/hook-notify/main/install.sh | b
 ### 或本地安装
 
 ```bash
-git clone https://github.com/xxx/hook-notify.git
+git clone https://github.com/Jingnan-Jia/hook-notify.git
 cd hook-notify
 bash install.sh
 ```

@@ -19,7 +19,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 INSTALL_DIR="$HOME/.hook-notify"
-REPO_URL="${HOOK_NOTIFY_REPO:-https://github.com/xxx/hook-notify.git}"
+REPO_URL="${HOOK_NOTIFY_REPO:-https://github.com/Jingnan-Jia/hook-notify.git}"
 BRANCH="${HOOK_NOTIFY_BRANCH:-main}"
 
 echo ""
