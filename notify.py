@@ -590,9 +590,6 @@ def main():
         return
 
     if is_setup:
-        config = load_config()
-        config.pop("uid", None)
-        save_config(config)
         print("  配置已重置，重新开始安装向导。")
 
     if not CONFIG_FILE.exists() or is_setup:

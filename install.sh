@@ -127,4 +127,22 @@ echo ""
 # --------------------------------------------------
 # 启动安装向导
 # --------------------------------------------------
+# 预写默认 AppToken，减少交互步骤
+$PYTHON -c "
+import json
+from pathlib import Path
+config_file = Path.home() / '.hook-notify' / 'config.json'
+config = {}
+if config_file.exists():
+    try:
+        with open(config_file) as f:
+            config = json.load(f)
+    except: pass
+if not config.get('appToken'):
+    config['appToken'] = 'AT_mx4gZJ9t47IibakBWuCQ5qoNyfn0eJXo'
+config_file.parent.mkdir(parents=True, exist_ok=True)
+with open(config_file, 'w') as f:
+    json.dump(config, f, indent=2, ensure_ascii=False)
+"
+
 exec $PYTHON "$INSTALL_DIR/notify.py" --setup < /dev/tty
