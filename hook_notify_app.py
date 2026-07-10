@@ -174,6 +174,78 @@ def configure_claude_code_hook():
     return True
 
 
+def _configure_hooks_json(config_path, tool_name, extra_events=None):
+    """通用 hook JSON 配置器，用于 Codex CLI 等。"""
+    existing = {}
+    config_path = os.path.expanduser(config_path)
+    if os.path.exists(config_path):
+        try:
+            with open(config_path) as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+
+    script_path = APP_DIR / "notify.py"
+    existing.setdefault("hooks", {})
+
+    # Stop hook (兜底：每次响应结束)
+    stop_cmd = f"python3 {script_path} '{tool_name} 已停止，需要你的确认'"
+    stop_entry = {"type": "command", "command": stop_cmd}
+    existing["hooks"].setdefault("Stop", [])
+
+    already_has_stop = False
+    for group in existing["hooks"]["Stop"]:
+        for h in group.get("hooks", []):
+            if h.get("command") == stop_cmd:
+                already_has_stop = True
+    if not already_has_stop:
+        existing["hooks"]["Stop"].append({"hooks": [stop_entry]})
+
+    # 额外事件（如 PermissionRequest）
+    if extra_events:
+        for event_name in extra_events:
+            cmd = f"python3 {script_path} '{tool_name} 需要你的授权'"
+            entry = {"type": "command", "command": cmd}
+            existing["hooks"].setdefault(event_name, [])
+            already_has = False
+            for group in existing["hooks"][event_name]:
+                for h in group.get("hooks", []):
+                    if h.get("command") == cmd:
+                        already_has = True
+            if not already_has:
+                existing["hooks"][event_name].append({"hooks": [entry]})
+
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, "w") as f:
+        json.dump(existing, f, indent=2, ensure_ascii=False)
+    return True
+
+
+def configure_codex_hook():
+    """配置 Codex CLI 的 Stop + PermissionRequest hook。"""
+    return _configure_hooks_json(
+        "~/.codex/hooks.json",
+        "Codex CLI",
+        extra_events=["PermissionRequest"]
+    )
+
+
+def configure_codebuddy_hook():
+    """配置 CodeBuddy 的 Stop + Notification hook。"""
+    return _configure_hooks_json(
+        "~/.codebuddy/settings.json",
+        "CodeBuddy",
+        extra_events=["Notification"]
+    )
+
+
+HOOK_CONFIGURATORS = {
+    "Claude Code": configure_claude_code_hook,
+    "OpenAI Codex CLI": configure_codex_hook,
+    "CodeBuddy": configure_codebuddy_hook,
+}
+
+
 def send_test_notification(app_token, uid):
     """发送测试通知。"""
     try:
@@ -543,9 +615,10 @@ class HookNotifyApp:
             row = tk.Frame(card, bg=COLOR_CARD)
             row.pack(fill="x", pady=4)
 
-            if name == "Claude Code":
+            configurator = HOOK_CONFIGURATORS.get(name)
+            if configurator:
                 try:
-                    configure_claude_code_hook()
+                    configurator()
                     status = "\u2705 \u5df2\u914d\u7f6e"
                     color = COLOR_SUCCESS
                 except Exception:

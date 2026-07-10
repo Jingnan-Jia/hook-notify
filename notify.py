@@ -57,13 +57,13 @@ KNOWN_TERMINALS = {
         "name": "OpenAI Codex CLI",
         "check_paths": ["~/.codex"],
         "check_commands": ["codex"],
-        "hook_config": None,  # 暂不支持自动配置
+        "hook_config": "codex",
     },
     "codebuddy": {
         "name": "CodeBuddy",
         "check_paths": ["~/.codebuddy"],
         "check_commands": ["codebuddy"],
-        "hook_config": None,
+        "hook_config": "codebuddy",
     },
     "windsurf": {
         "name": "Windsurf",
@@ -150,6 +150,7 @@ def query_users(app_token):
             return records
         else:
             print(f"  ⚠ 查询用户失败: code={data.get('code')} msg={data.get('msg')}")
+            print(f"  DEBUG token={app_token[:10]}...{app_token[-10:]}")
             return []
     except requests.RequestException as e:
         print(f"  ⚠ 网络请求失败: {e}")
@@ -316,8 +317,76 @@ def configure_claude_code(script_path):
     return True
 
 
+def _configure_generic_hook(config_path, tool_name, extra_events=None):
+    """通用 hook JSON 配置器，支持 Codex CLI 和 CodeBuddy。"""
+    existing = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path) as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            existing = {}
+
+    script_path = SCRIPT_DIR / "notify.py"
+    existing.setdefault("hooks", {})
+
+    # Stop hook（兜底）
+    stop_cmd = f"python3 {script_path} '{tool_name} 已停止，需要你的确认'"
+    stop_entry = {"type": "command", "command": stop_cmd}
+    existing["hooks"].setdefault("Stop", [])
+
+    already_has = False
+    for group in existing["hooks"]["Stop"]:
+        for h in group.get("hooks", []):
+            if h.get("command") == stop_cmd:
+                already_has = True
+    if not already_has:
+        existing["hooks"]["Stop"].append({"hooks": [stop_entry]})
+        print(f"  ✓ {tool_name} Stop hook 已配置")
+
+    # 额外事件
+    if extra_events:
+        for event_name in extra_events:
+            cmd = f"python3 {script_path} '{tool_name} 需要你的授权'"
+            entry = {"type": "command", "command": cmd}
+            existing["hooks"].setdefault(event_name, [])
+            already_has = False
+            for group in existing["hooks"][event_name]:
+                for h in group.get("hooks", []):
+                    if h.get("command") == cmd:
+                        already_has = True
+            if not already_has:
+                existing["hooks"][event_name].append({"hooks": [entry]})
+                print(f"  ✓ {tool_name} {event_name} hook 已配置")
+
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, "w") as f:
+        json.dump(existing, f, indent=2, ensure_ascii=False)
+    return True
+
+
+def configure_codex(_script_path=None):
+    """配置 Codex CLI hook。"""
+    return _configure_generic_hook(
+        os.path.expanduser("~/.codex/hooks.json"),
+        "Codex CLI",
+        extra_events=["PermissionRequest"]
+    )
+
+
+def configure_codebuddy(_script_path=None):
+    """配置 CodeBuddy hook。"""
+    return _configure_generic_hook(
+        os.path.expanduser("~/.codebuddy/settings.json"),
+        "CodeBuddy",
+        extra_events=["Notification"]
+    )
+
+
 TERMINAL_HOOK_CONFIGURATORS = {
     "claude_code": configure_claude_code,
+    "codex": configure_codex,
+    "codebuddy": configure_codebuddy,
 }
 
 
@@ -578,21 +647,27 @@ def show_status():
     else:
         print("  未检测到 AI 终端")
 
-    # 检查 hook 配置
+    # 检查各终端 hook 配置
     print()
-    settings_path = os.path.expanduser("~/.claude/settings.json")
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r") as f:
-                settings = json.load(f)
-            if "hooks" in settings and "Stop" in settings["hooks"]:
-                print("  Claude Code Stop Hook: ✓ 已配置")
-            else:
-                print("  Claude Code Stop Hook: ✗ 未配置")
-        except (json.JSONDecodeError, IOError):
-            print("  Claude Code Stop Hook: ✗ 配置文件读取失败")
-    else:
-        print("  Claude Code Stop Hook: ✗ 未配置")
+    hook_checks = {
+        "Claude Code": "~/.claude/settings.json",
+        "OpenAI Codex CLI": "~/.codex/hooks.json",
+        "CodeBuddy": "~/.codebuddy/settings.json",
+    }
+    for name, path in hook_checks.items():
+        fpath = os.path.expanduser(path)
+        if os.path.exists(fpath):
+            try:
+                with open(fpath) as f:
+                    cfg = json.load(f)
+                if "hooks" in cfg and "Stop" in cfg["hooks"]:
+                    print(f"  {name} Hook: ✓ 已配置")
+                else:
+                    print(f"  {name} Hook: ✗ 未配置")
+            except (json.JSONDecodeError, IOError):
+                print(f"  {name} Hook: ✗ 文件读取失败")
+        else:
+            print(f"  {name} Hook: - 未检测到")
 
     print()
 
