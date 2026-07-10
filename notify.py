@@ -146,9 +146,10 @@ def query_users(app_token):
         }, timeout=10)
         data = resp.json()
         if data.get("code") == 1000:
-            return data.get("data", {}).get("records", [])
+            records = data.get("data", {}).get("records", [])
+            return records
         else:
-            print(f"  ⚠ 查询用户失败: {data.get('msg', '未知错误')}")
+            print(f"  ⚠ 查询用户失败: code={data.get('code')} msg={data.get('msg')}")
             return []
     except requests.RequestException as e:
         print(f"  ⚠ 网络请求失败: {e}")
