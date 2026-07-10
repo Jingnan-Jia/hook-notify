@@ -264,7 +264,7 @@ def detect_terminals():
 # ============================================================
 
 def configure_claude_code(script_path):
-    """为 Claude Code 配置 Stop hook。"""
+    """为 Claude Code 配置 Notification + Stop hook。"""
     settings_path = os.path.expanduser("~/.claude/settings.json")
     existing = {}
 
@@ -276,44 +276,43 @@ def configure_claude_code(script_path):
         except (json.JSONDecodeError, IOError):
             existing = {}
 
-    # 构建 hook 命令
-    hook_cmd = f"python3 {script_path} 'Claude Code 已停止，需要你的确认'"
-
-    # 构建 hook 条目
-    hook_entry = {
-        "type": "command",
-        "command": hook_cmd,
-        "async": True,
-    }
-
-    # 合并到现有配置
     if "hooks" not in existing:
         existing["hooks"] = {}
-    if "Stop" not in existing["hooks"]:
-        existing["hooks"]["Stop"] = []
+    stop_cmd = f"python3 {script_path} 'Claude Code 已停止，需要你的确认'"
+    notif_cmd = f"python3 {script_path} 'Claude Code 需要你的授权或确认'"
 
-    # 检查是否已存在相同 hook
-    stop_hooks = existing["hooks"]["Stop"]
-    hook_group_exists = False
-    for group in stop_hooks:
-        if "hooks" in group:
-            for h in group["hooks"]:
-                if h.get("command") == hook_cmd:
-                    print(f"  ✓ Claude Code hook 已配置，跳过")
-                    return True
+    # Notification hook: 权限请求时触发
+    existing["hooks"].setdefault("Notification", [])
+    already_has = False
+    for group in existing["hooks"]["Notification"]:
+        for h in group.get("hooks", []):
+            if h.get("command") == notif_cmd:
+                already_has = True
+    if not already_has:
+        existing["hooks"]["Notification"].append({
+            "hooks": [{"type": "command", "command": notif_cmd, "async": True}]
+        })
+        print(f"  ✓ Claude Code Notification hook 已配置")
 
-    # 添加新 hook
-    stop_hooks.append({
-        "hooks": [hook_entry]
-    })
-    existing["hooks"]["Stop"] = stop_hooks
+    # Stop hook: 对话结束兜底
+    existing["hooks"].setdefault("Stop", [])
+    already_has = False
+    for group in existing["hooks"]["Stop"]:
+        for h in group.get("hooks", []):
+            if h.get("command") == stop_cmd:
+                already_has = True
+                print(f"  ✓ Claude Code Stop hook 已配置，跳过")
+    if not already_has:
+        existing["hooks"]["Stop"].append({
+            "hooks": [{"type": "command", "command": stop_cmd, "async": True}]
+        })
+        print(f"  ✓ Claude Code Stop hook 已配置")
 
     # 写入配置
     os.makedirs(os.path.dirname(settings_path), exist_ok=True)
     with open(settings_path, "w") as f:
         json.dump(existing, f, indent=2, ensure_ascii=False)
 
-    print(f"  ✓ Claude Code hook 已配置 → {settings_path}")
     return True
 
 

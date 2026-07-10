@@ -147,7 +147,7 @@ def detect_terminals():
 
 
 def configure_claude_code_hook():
-    """配置 Claude Code 的 Stop hook。"""
+    """配置 Claude Code 的 Notification + Stop hook。"""
     settings_path = os.path.expanduser("~/.claude/settings.json")
     existing = {}
     if os.path.exists(settings_path):
@@ -158,16 +158,32 @@ def configure_claude_code_hook():
             pass
 
     script_path = APP_DIR / "notify.py"
-    hook_cmd = f"python3 {script_path} 'Claude Code 已停止，需要你的确认'"
-    hook_entry = {"type": "command", "command": hook_cmd, "async": True}
+    existing.setdefault("hooks", {})
 
-    existing.setdefault("hooks", {}).setdefault("Stop", [])
+    # Notification hook: 权限请求时触发
+    notif_cmd = f"python3 {script_path} 'Claude Code 需要你的授权或确认'"
+    notif_entry = {"type": "command", "command": notif_cmd, "async": True}
+    existing["hooks"].setdefault("Notification", [])
+    already_has_notif = False
+    for group in existing["hooks"]["Notification"]:
+        for h in group.get("hooks", []):
+            if h.get("command") == notif_cmd:
+                already_has_notif = True
+    if not already_has_notif:
+        existing["hooks"]["Notification"].append({"hooks": [notif_entry]})
+
+    # Stop hook: 对话结束兜底
+    stop_cmd = f"python3 {script_path} 'Claude Code 已停止，需要你的确认'"
+    stop_entry = {"type": "command", "command": stop_cmd, "async": True}
+    existing["hooks"].setdefault("Stop", [])
+    already_has_stop = False
     for group in existing["hooks"]["Stop"]:
         for h in group.get("hooks", []):
-            if h.get("command") == hook_cmd:
-                return True  # already configured
+            if h.get("command") == stop_cmd:
+                already_has_stop = True
+    if not already_has_stop:
+        existing["hooks"]["Stop"].append({"hooks": [stop_entry]})
 
-    existing["hooks"]["Stop"].append({"hooks": [hook_entry]})
     os.makedirs(os.path.dirname(settings_path), exist_ok=True)
     with open(settings_path, "w") as f:
         json.dump(existing, f, indent=2, ensure_ascii=False)
