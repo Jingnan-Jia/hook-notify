@@ -676,25 +676,49 @@ def show_status():
 
     # 检查各终端 hook 配置
     print()
+    script_path = str(SCRIPT_DIR / "notify.py")
+    deployed_path = os.path.expanduser("~/.hook-notify/notify.py")
     hook_checks = {
-        "Claude Code": "~/.claude/settings.json",
-        "OpenAI Codex CLI": "~/.codex/hooks.json",
-        "CodeBuddy": "~/.codebuddy/settings.json",
+        "Claude Code": {
+            "path": "~/.claude/settings.json",
+            "events": ["Notification", "PermissionRequest", "AskUserQuestion", "Stop"],
+        },
+        "OpenAI Codex CLI": {
+            "path": "~/.codex/hooks.json",
+            "events": ["Stop", "PermissionRequest", "Notification"],
+        },
+        "CodeBuddy": {
+            "path": "~/.codebuddy/settings.json",
+            "events": ["Stop", "Notification", "PermissionRequest"],
+        },
     }
-    for name, path in hook_checks.items():
-        fpath = os.path.expanduser(path)
-        if os.path.exists(fpath):
-            try:
-                with open(fpath) as f:
-                    cfg = json.load(f)
-                if "hooks" in cfg and "Stop" in cfg["hooks"]:
-                    print(f"  {name} Hook: ✓ 已配置")
-                else:
-                    print(f"  {name} Hook: ✗ 未配置")
-            except (json.JSONDecodeError, IOError):
-                print(f"  {name} Hook: ✗ 文件读取失败")
-        else:
+    for name, info in hook_checks.items():
+        fpath = os.path.expanduser(info["path"])
+        if not os.path.exists(fpath):
             print(f"  {name} Hook: - 未检测到")
+            continue
+
+        try:
+            with open(fpath) as f:
+                cfg = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            print(f"  {name} Hook: ✗ 配置文件读取失败")
+            continue
+
+        hooks = cfg.get("hooks", {})
+        for event in info["events"]:
+            if event not in hooks:
+                print(f"  {name} {event}: ✗ 事件不存在（终端可能已升级）")
+                continue
+            found_ours = any(
+                script_path in h.get("command", "") or deployed_path in h.get("command", "")
+                for group in hooks[event]
+                for h in group.get("hooks", [])
+            )
+            if found_ours:
+                print(f"  {name} {event}: ✓")
+            else:
+                print(f"  {name} {event}: ⚠ 事件存在但非 hook-notify 配置")
 
     print()
 
