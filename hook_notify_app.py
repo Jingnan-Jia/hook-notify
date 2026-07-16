@@ -172,6 +172,30 @@ def configure_claude_code_hook():
     if not already_has_notif:
         existing["hooks"]["Notification"].append({"hooks": [notif_entry]})
 
+    # PermissionRequest hook: 权限确认弹窗
+    perm_cmd = f"python3 {script_path} 'Claude Code 需要你的权限确认'"
+    perm_entry = {"type": "command", "command": perm_cmd, "async": True}
+    existing["hooks"].setdefault("PermissionRequest", [])
+    already_has_perm = False
+    for group in existing["hooks"]["PermissionRequest"]:
+        for h in group.get("hooks", []):
+            if h.get("command") == perm_cmd:
+                already_has_perm = True
+    if not already_has_perm:
+        existing["hooks"]["PermissionRequest"].append({"hooks": [perm_entry]})
+
+    # AskUserQuestion hook: AI 主动问问题等待
+    ask_cmd = f"python3 {script_path} 'Claude Code 需要你回答一个问题'"
+    ask_entry = {"type": "command", "command": ask_cmd, "async": True}
+    existing["hooks"].setdefault("AskUserQuestion", [])
+    already_has_ask = False
+    for group in existing["hooks"]["AskUserQuestion"]:
+        for h in group.get("hooks", []):
+            if h.get("command") == ask_cmd:
+                already_has_ask = True
+    if not already_has_ask:
+        existing["hooks"]["AskUserQuestion"].append({"hooks": [ask_entry]})
+
     # Stop hook: 对话结束兜底
     stop_cmd = f"python3 {script_path} 'Claude Code 已停止，需要你的确认'"
     stop_entry = {"type": "command", "command": stop_cmd, "async": True}
@@ -238,20 +262,20 @@ def _configure_hooks_json(config_path, tool_name, extra_events=None):
 
 
 def configure_codex_hook():
-    """配置 Codex CLI 的 Stop + PermissionRequest hook。"""
+    """配置 Codex CLI 的 Stop + PermissionRequest + Notification hook。"""
     return _configure_hooks_json(
         "~/.codex/hooks.json",
         "Codex CLI",
-        extra_events=["PermissionRequest"]
+        extra_events=["PermissionRequest", "Notification"]
     )
 
 
 def configure_codebuddy_hook():
-    """配置 CodeBuddy 的 Stop + Notification hook。"""
+    """配置 CodeBuddy 的 Stop + Notification + PermissionRequest hook。"""
     return _configure_hooks_json(
         "~/.codebuddy/settings.json",
         "CodeBuddy",
-        extra_events=["Notification"]
+        extra_events=["Notification", "PermissionRequest"]
     )
 
 

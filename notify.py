@@ -294,6 +294,34 @@ def configure_claude_code(script_path):
         })
         print(f"  ✓ Claude Code Notification hook 已配置")
 
+    # PermissionRequest hook: 权限确认弹窗
+    perm_cmd = f"python3 {script_path} 'Claude Code 需要你的权限确认'"
+    existing["hooks"].setdefault("PermissionRequest", [])
+    already_has = False
+    for group in existing["hooks"]["PermissionRequest"]:
+        for h in group.get("hooks", []):
+            if h.get("command") == perm_cmd:
+                already_has = True
+    if not already_has:
+        existing["hooks"]["PermissionRequest"].append({
+            "hooks": [{"type": "command", "command": perm_cmd, "async": True}]
+        })
+        print(f"  ✓ Claude Code PermissionRequest hook 已配置")
+
+    # AskUserQuestion hook: AI 主动问问题等待
+    ask_cmd = f"python3 {script_path} 'Claude Code 需要你回答一个问题'"
+    existing["hooks"].setdefault("AskUserQuestion", [])
+    already_has = False
+    for group in existing["hooks"]["AskUserQuestion"]:
+        for h in group.get("hooks", []):
+            if h.get("command") == ask_cmd:
+                already_has = True
+    if not already_has:
+        existing["hooks"]["AskUserQuestion"].append({
+            "hooks": [{"type": "command", "command": ask_cmd, "async": True}]
+        })
+        print(f"  ✓ Claude Code AskUserQuestion hook 已配置")
+
     # Stop hook: 对话结束兜底
     existing["hooks"].setdefault("Stop", [])
     already_has = False
@@ -369,7 +397,7 @@ def configure_codex(_script_path=None):
     return _configure_generic_hook(
         os.path.expanduser("~/.codex/hooks.json"),
         "Codex CLI",
-        extra_events=["PermissionRequest"]
+        extra_events=["PermissionRequest", "Notification"]
     )
 
 
@@ -378,7 +406,7 @@ def configure_codebuddy(_script_path=None):
     return _configure_generic_hook(
         os.path.expanduser("~/.codebuddy/settings.json"),
         "CodeBuddy",
-        extra_events=["Notification"]
+        extra_events=["Notification", "PermissionRequest"]
     )
 
 
