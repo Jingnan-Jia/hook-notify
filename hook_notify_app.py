@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import time
+import hashlib
 import threading
 import tkinter as tk
 from tkinter import font as tkfont
@@ -46,6 +47,26 @@ COLOR_WARNING = "#f59e0b"
 COLOR_ERROR = "#ef4444"
 COLOR_BORDER = "#3f3f5c"
 
+HOOK_CONFIG_PATHS = {
+    "Claude Code": os.path.expanduser("~/.claude/settings.json"),
+    "OpenAI Codex CLI": os.path.expanduser("~/.codex/hooks.json"),
+    "CodeBuddy": os.path.expanduser("~/.codebuddy/settings.json"),
+}
+
+
+def compute_hook_hashes():
+    """计算各终端 hook 配置文件的 SHA256 哈希。"""
+    hashes = {}
+    for name, path in HOOK_CONFIG_PATHS.items():
+        if os.path.exists(path):
+            try:
+                with open(path, "rb") as f:
+                    hashes[name] = hashlib.sha256(f.read()).hexdigest()
+            except IOError:
+                pass
+    return hashes
+
+
 # ============================================================
 # 工具函数
 # ============================================================
@@ -53,10 +74,41 @@ COLOR_BORDER = "#3f3f5c"
 # notify.py 的核心内容，部署到 ~/.hook-notify/ 供 Hook 调用
 NOTIFY_SCRIPT = r'''#!/usr/bin/env python3
 """hook-notify: 发送通知到微信。供 AI 终端 Hook 调用。"""
-import json, os, sys, requests
+import json, os, sys, hashlib, requests
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 WXPUSHER_SEND_URL = "https://wxpusher.zjiecode.com/api/send/message"
+
+HOOK_CONFIG_PATHS = {
+    "Claude Code": os.path.expanduser("~/.claude/settings.json"),
+    "OpenAI Codex CLI": os.path.expanduser("~/.codex/hooks.json"),
+    "CodeBuddy": os.path.expanduser("~/.codebuddy/settings.json"),
+}
+
+
+def compute_hook_hashes():
+    hashes = {}
+    for name, path in HOOK_CONFIG_PATHS.items():
+        if os.path.exists(path):
+            try:
+                with open(path, "rb") as f:
+                    hashes[name] = hashlib.sha256(f.read()).hexdigest()
+            except IOError:
+                pass
+    return hashes
+
+
+def check_hook_integrity(cfg):
+    stored = cfg.get("hook_hashes", {})
+    if not stored:
+        return []
+    current = compute_hook_hashes()
+    changed = []
+    for name, stored_hash in stored.items():
+        if name in current and current[name] != stored_hash:
+            changed.append(name)
+    return changed
+
 
 def send():
     if not os.path.exists(CONFIG_FILE):
@@ -65,6 +117,12 @@ def send():
     with open(CONFIG_FILE) as f:
         cfg = json.load(f)
     msg = sys.argv[1] if len(sys.argv) > 1 else "AI 终端需要你的确认"
+
+    # 自检：hook 配置文件是否被外部改动（终端升级等）
+    changed = check_hook_integrity(cfg)
+    if changed:
+        msg += f"\n\n⚠️ Hook 配置已变化（{', '.join(changed)}），请运行 hook-notify 检查"
+
     payload = {
         "appToken": cfg.get("appToken", ""),
         "content": msg,
@@ -682,6 +740,7 @@ class HookNotifyApp:
         self.config["uid"] = self.uid
         self.config["version"] = 1
         self.config["configured_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        self.config["hook_hashes"] = compute_hook_hashes()
         save_config(self.config)
 
         # 按钮

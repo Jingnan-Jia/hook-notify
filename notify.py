@@ -19,6 +19,7 @@ import sys
 import subprocess
 import time
 import re
+import hashlib
 from pathlib import Path
 
 try:
@@ -79,6 +80,13 @@ KNOWN_TERMINALS = {
     },
 }
 
+HOOK_CONFIG_PATHS = {
+    "Claude Code": "~/.claude/settings.json",
+    "OpenAI Codex CLI": "~/.codex/hooks.json",
+    "CodeBuddy": "~/.codebuddy/settings.json",
+}
+
+
 # ============================================================
 # 工具函数
 # ============================================================
@@ -130,6 +138,33 @@ def run_command(cmd):
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
+
+
+def compute_hook_hashes():
+    """计算各终端 hook 配置文件的 SHA256 哈希。"""
+    hashes = {}
+    for name, path in HOOK_CONFIG_PATHS.items():
+        fpath = os.path.expanduser(path)
+        if os.path.exists(fpath):
+            try:
+                with open(fpath, "rb") as f:
+                    hashes[name] = hashlib.sha256(f.read()).hexdigest()
+            except IOError:
+                pass
+    return hashes
+
+
+def check_hook_integrity(config):
+    """检查 hook 配置是否与上次 setup 一致。返回已变更的终端名列表。"""
+    stored = config.get("hook_hashes", {})
+    if not stored:
+        return []
+    current = compute_hook_hashes()
+    changed = []
+    for name, stored_hash in stored.items():
+        if name in current and current[name] != stored_hash:
+            changed.append(name)
+    return changed
 
 
 # ============================================================
@@ -607,6 +642,7 @@ def setup_wizard():
     # 保存最终配置
     config["version"] = 1
     config["configured_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    config["hook_hashes"] = compute_hook_hashes()
     save_config(config)
 
     # 发送测试通知
@@ -776,6 +812,12 @@ def main():
     # 默认：发送通知
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     message = args[0] if args else "AI 终端需要你的确认"
+
+    # 自检：hook 配置文件是否被外部改动（终端升级等）
+    changed = check_hook_integrity(config)
+    if changed:
+        message += f"\n\n⚠️ Hook 配置已变化（{', '.join(changed)}），请运行 python3 notify.py --status 检查"
+
     summary = message[:50]
 
     ok, msg = send_message(app_token, uids, message, summary=summary)
